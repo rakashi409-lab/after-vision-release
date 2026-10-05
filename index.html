@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>After Vision · 视界之后 — 把平面图像，变成可以转动的光</title>
+<meta name="description" content="After Vision 视界之后：在 Photoshop 里把一个图层变成可 360° 转动、自带抠图与深度、可重打光的立体图层。抠图、深度、立体全程在本机运行。">
+<meta property="og:title" content="After Vision · 视界之后">
+<meta property="og:description" content="把平面图像，变成可以转动的光。一个 Photoshop 插件。">
+<meta name="theme-color" content="#0b0a0d">
+<style>
+/* ===================== 设计体系 ===================== */
+:root{
+  --ink:#0b0a0d;            /* 近黑底 */
+  --ink2:#121016;
+  --paper:#ede7da;         /* 近白字 */
+  --mute:#8c887f;          /* 次要字 */
+  --faint:#5a564e;
+  --gold-1:#eadcb0;        /* 金 · 亮 */
+  --gold-2:#c9b98a;
+  --gold-3:#a8966a;        /* 金 · 暗 */
+  --ghost:#6fd7dc;         /* 残像 · 金的补色（冷青） */
+  --ghost2:#e07bbf;        /* 残像 · 品红 */
+  --line:rgba(201,185,138,.16);
+  --maxw:1180px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--ink);color:var(--paper);
+  font-family:"Segoe UI","Microsoft YaHei UI","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;line-height:1.7;overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+section{position:relative;z-index:1}
+section[id],main[id]{scroll-margin-top:88px}   /* 点导航跳转时，标题不被固定头部盖住 */
+
+/* 视网膜辉光 + 噪点底（固定背景） */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+.bg .glow{position:absolute;width:120vmax;height:120vmax;left:50%;top:-10vmax;transform:translateX(-50%);
+  background:radial-gradient(circle at 50% 35%,rgba(120,100,60,.22),rgba(80,70,50,.06) 32%,transparent 60%);
+  animation:breathe 14s var(--ease) infinite alternate}
+@keyframes breathe{from{opacity:.65;transform:translateX(-50%) scale(1)}to{opacity:1;transform:translateX(-52%) scale(1.08)}}
+.bg .grain{position:absolute;inset:-200%;opacity:.045;mix-blend-mode:screen;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  animation:grain 7s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}100%{transform:translate(-12%,8%)}}
+
+/* 光标残影 */
+.cursor-ghost{position:fixed;z-index:60;width:7px;height:7px;border-radius:50%;pointer-events:none;
+  background:var(--gold-1);mix-blend-mode:screen;transform:translate(-50%,-50%);opacity:0;transition:opacity .4s}
+
+/* ===================== 导航 ===================== */
+header{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .4s,backdrop-filter .4s,border-color .4s;
+  border-bottom:1px solid transparent}
+header.on{background:rgba(11,10,13,.72);backdrop-filter:blur(14px) saturate(1.2);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+.brand{display:flex;align-items:center;gap:12px;letter-spacing:.18em}
+.brand svg{width:26px;height:26px;filter:drop-shadow(0 2px 8px rgba(201,185,138,.25))}
+.brand b{font-weight:600;font-size:14px}
+.brand small{color:var(--mute);font-size:11px;letter-spacing:.42em;margin-left:-4px}
+.nav-links{display:flex;align-items:center;gap:30px;font-size:13.5px;color:var(--mute)}
+.nav-links a{letter-spacing:.06em;transition:color .3s}
+.nav-links a:hover{color:var(--paper)}
+.nav-dl{color:var(--ink)!important;background:linear-gradient(135deg,var(--gold-1),var(--gold-3));
+  padding:9px 20px;border-radius:999px;font-weight:600;letter-spacing:.05em;
+  box-shadow:0 6px 24px rgba(201,185,138,.22);transition:transform .3s var(--ease),box-shadow .3s}
+.nav-dl:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(201,185,138,.36)}
+@media(max-width:720px){.nav-links a:not(.nav-dl){display:none}}
+
+/* ===================== Hero ===================== */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:120px 0 80px}
+.eyebrow{display:inline-flex;align-items:center;gap:12px;color:var(--gold-2);font-size:12.5px;
+  letter-spacing:.42em;text-transform:uppercase;margin-bottom:30px;opacity:0;animation:fade 1s .2s var(--ease) forwards}
+.eyebrow::before{content:"";width:34px;height:1px;background:linear-gradient(90deg,transparent,var(--gold-2))}
+
+/* 色散残影标题 */
+.word{position:relative;font-weight:200;line-height:.92;letter-spacing:.02em;
+  font-size:clamp(52px,10.5vw,138px);margin:0}
+.word .layer{display:block;position:relative}
+.word .g{position:absolute;inset:0;mix-blend-mode:screen;pointer-events:none;
+  transition:transform .5s var(--ease),opacity .6s}
+.word .g.cyan{color:var(--ghost);transform:translate(calc(var(--mx,0) * -1px),2px)}
+.word .g.mag{color:var(--ghost2);transform:translate(calc(var(--mx,0) * 1px),-2px)}
+.word .base{background:linear-gradient(180deg,#fff,var(--gold-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.word.resolve .g{animation:settle 2.2s var(--ease) forwards}
+@keyframes settle{0%{transform:translate(var(--sx),var(--sy));opacity:.9}100%{transform:translate(0,0);opacity:.35}}
+.sub-cn{font-size:clamp(20px,3vw,30px);font-weight:300;letter-spacing:.5em;color:var(--paper);margin:18px 0 0;
+  opacity:0;animation:fade 1s 1.4s var(--ease) forwards}
+.lead{max-width:540px;margin:30px 0 0;color:var(--mute);font-size:17px;
+  opacity:0;animation:fade 1s 1.6s var(--ease) forwards}
+.lead b{color:var(--paper);font-weight:500}
+.cta{display:flex;gap:16px;flex-wrap:wrap;margin-top:40px;opacity:0;animation:fade 1s 1.8s var(--ease) forwards}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:15px 30px;border-radius:999px;font-size:15px;
+  font-weight:600;letter-spacing:.04em;transition:transform .3s var(--ease),box-shadow .3s,border-color .3s}
+.btn-primary{color:var(--ink);background:linear-gradient(135deg,var(--gold-1),var(--gold-3));
+  box-shadow:0 10px 34px rgba(201,185,138,.26)}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 18px 48px rgba(201,185,138,.4)}
+.btn-ghost{color:var(--paper);border:1px solid var(--line)}
+.btn-ghost:hover{border-color:var(--gold-2);transform:translateY(-3px)}
+.btn small{font-weight:400;opacity:.7}
+.os-note{margin-top:16px;color:var(--faint);font-size:12.5px;letter-spacing:.04em;
+  opacity:0;animation:fade 1s 2s var(--ease) forwards}
+
+/* 滚动提示 */
+.scroll-cue{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);color:var(--faint);
+  font-size:11px;letter-spacing:.3em;display:flex;flex-direction:column;align-items:center;gap:10px;
+  opacity:0;animation:fade 1s 2.3s var(--ease) forwards}
+.scroll-cue i{width:1px;height:46px;background:linear-gradient(var(--gold-2),transparent);animation:cue 2s var(--ease) infinite}
+@keyframes cue{0%,100%{transform:scaleY(.4);opacity:.4;transform-origin:top}50%{transform:scaleY(1);opacity:1}}
+
+@keyframes fade{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===================== 通用区块 ===================== */
+/* 渐进增强：无 JS 或「减少动态」时正文默认可见，只有启用 JS 才先隐藏再揭示 */
+.reveal{transition:opacity 1s var(--ease),transform 1s var(--ease)}
+.js .reveal{opacity:0;transform:translateY(34px)}
+.js .reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.js .reveal{opacity:1;transform:none;transition:none}}
+.sec-head{margin:0 0 54px}
+.sec-tag{color:var(--gold-2);font-size:12px;letter-spacing:.4em;text-transform:uppercase}
+.sec-title{font-size:clamp(28px,4.2vw,46px);font-weight:300;letter-spacing:.04em;margin:16px 0 0;line-height:1.25}
+.sec-title b{font-weight:600;background:linear-gradient(120deg,var(--gold-1),var(--gold-3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sec-desc{max-width:560px;color:var(--mute);margin:18px 0 0;font-size:16px}
+.pad{padding:120px 0}
+.hr{height:1px;background:var(--line);max-width:var(--maxw);margin:0 auto}
+
+/* ===================== 凝视 · 残像实验 ===================== */
+.stare{padding:120px 0}
+.stare-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+@media(max-width:860px){.stare-grid{grid-template-columns:1fr;gap:36px}}
+.stage{position:relative;aspect-ratio:4/3;border-radius:18px;overflow:hidden;border:1px solid var(--line);
+  background:radial-gradient(circle at 50% 50%,#1a1820,#0d0c10);display:flex;align-items:center;justify-content:center}
+.stage .inverted{width:42%;filter:saturate(1.6);opacity:0;transition:opacity .25s}
+.stage.go .inverted{opacity:1}
+.stage.flash .inverted{opacity:0;transition:opacity .9s ease-out}
+.stage .fix{position:absolute;width:12px;height:12px;opacity:0;transition:opacity .3s}
+.stage.go .fix{opacity:.9}
+.stage .fix::before,.stage .fix::after{content:"";position:absolute;background:#fff;opacity:.8}
+.stage .fix::before{left:5px;top:0;width:2px;height:12px}
+.stage .fix::after{top:5px;left:0;height:2px;width:12px}
+.stage .grey{position:absolute;inset:0;background:#8f8f8f;opacity:0;transition:opacity .5s}
+.stage.flash .grey{opacity:1}
+.ring{position:absolute;top:16px;right:16px;width:46px;height:46px;opacity:0;transition:opacity .3s}
+.stage.go .ring{opacity:1}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:3}
+.ring .bg2{stroke:rgba(255,255,255,.15)}
+.ring .fg{stroke:var(--ghost);stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.stage .cap{position:absolute;left:0;right:0;bottom:0;padding:16px 18px;font-size:13px;color:var(--paper);
+  background:linear-gradient(transparent,rgba(0,0,0,.6));opacity:0;transition:opacity .6s}
+.stage.flash .cap{opacity:1}
+.stare h3{font-size:clamp(24px,3.4vw,34px);font-weight:300;margin:0 0 6px}
+.stare h3 b{font-weight:600;color:var(--gold-1)}
+.stare p{color:var(--mute);margin:14px 0 0}
+.stare .mini{color:var(--faint);font-size:13px;margin-top:20px}
+.stare-btn{margin-top:26px;cursor:pointer;background:none;border:1px solid var(--gold-2);color:var(--gold-1);
+  padding:13px 26px;border-radius:999px;font-size:14px;letter-spacing:.08em;font-family:inherit;
+  transition:background .3s,color .3s,transform .3s}
+.stare-btn:hover{background:var(--gold-1);color:var(--ink);transform:translateY(-2px)}
+.stare-btn:disabled{opacity:.5;cursor:default;transform:none;background:none;color:var(--mute);border-color:var(--line)}
+
+/* ===================== 三重含义 ===================== */
+.meanings{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:18px;overflow:hidden}
+@media(max-width:820px){.meanings{grid-template-columns:1fr}}
+.meaning{background:var(--ink);padding:44px 34px;transition:background .5s}
+.meaning:hover{background:var(--ink2)}
+.meaning .idx{font-size:12px;letter-spacing:.3em;color:var(--gold-3)}
+.meaning h4{font-size:22px;font-weight:500;margin:20px 0 4px;letter-spacing:.06em}
+.meaning .en{color:var(--gold-2);font-size:12.5px;letter-spacing:.2em;text-transform:uppercase}
+.meaning p{color:var(--mute);font-size:14.5px;margin:16px 0 0}
+
+/* ===================== 四种形态 ===================== */
+.forms{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+@media(max-width:820px){.forms{grid-template-columns:1fr}}
+.form-card{position:relative;border:1px solid var(--line);border-radius:18px;padding:34px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);transition:transform .5s var(--ease),border-color .5s}
+.form-card:hover{transform:translateY(-6px);border-color:rgba(201,185,138,.4)}
+.form-stage{height:150px;display:flex;align-items:center;justify-content:center;perspective:700px;margin-bottom:26px}
+.cube{width:86px;height:86px;position:relative;transform-style:preserve-3d;animation:spin 9s linear infinite}
+.form-card:hover .cube{animation-duration:3.6s}
+@keyframes spin{from{transform:rotateY(0) rotateX(-14deg)}to{transform:rotateY(360deg) rotateX(-14deg)}}
+.cube i{position:absolute;inset:0;border:1px solid var(--gold-2);background:rgba(201,185,138,.08)}
+.cube .f1{transform:translateZ(43px)}.cube .f2{transform:rotateY(180deg) translateZ(43px)}
+.cube .f3{transform:rotateY(90deg) translateZ(43px)}.cube .f4{transform:rotateY(-90deg) translateZ(43px)}
+.cube .f5{transform:rotateX(90deg) translateZ(43px)}.cube .f6{transform:rotateX(-90deg) translateZ(43px)}
+/* 平面形态：扁平一片 */
+.form-card.flat .cube{animation:swing 6s var(--ease) infinite alternate}
+@keyframes swing{from{transform:rotateY(-32deg) rotateX(-8deg)}to{transform:rotateY(32deg) rotateX(6deg)}}
+.form-card.flat .cube i:not(.f1):not(.f2){opacity:0}
+.form-card.flat .cube .f2{transform:rotateY(180deg) translateZ(2px)}
+.form-card.flat .cube .f1{transform:translateZ(2px)}
+.form-num{position:absolute;top:26px;right:30px;font-size:46px;font-weight:200;color:rgba(201,185,138,.14)}
+.form-card h4{font-size:20px;font-weight:600;margin:0 0 2px;letter-spacing:.04em}
+.form-card .en{color:var(--gold-2);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase}
+.form-card p{color:var(--mute);font-size:14.5px;margin:14px 0 0}
+
+/* ===================== 图层特性 ===================== */
+.feature{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.feature.flip{direction:rtl}.feature.flip>*{direction:ltr}
+@media(max-width:860px){.feature{grid-template-columns:1fr;gap:34px}.feature.flip{direction:ltr}}
+.feature h3{font-size:clamp(24px,3.2vw,32px);font-weight:300;margin:0 0 4px;line-height:1.3}
+.feature h3 b{font-weight:600;color:var(--gold-1)}
+.feature p{color:var(--mute);margin:18px 0 0;font-size:15.5px}
+.feature ul{list-style:none;padding:0;margin:22px 0 0}
+.feature li{position:relative;padding-left:26px;margin:12px 0;color:var(--paper);font-size:15px}
+.feature li::before{content:"";position:absolute;left:0;top:9px;width:9px;height:9px;border-radius:2px;
+  background:linear-gradient(135deg,var(--gold-1),var(--gold-3))}
+.feature li span{color:var(--mute)}
+/* 图层插画 */
+.layers{position:relative;height:300px;perspective:1000px}
+.layers .ly{position:absolute;left:50%;top:50%;width:230px;height:150px;border-radius:12px;border:1px solid var(--line);
+  background:linear-gradient(135deg,rgba(201,185,138,.1),rgba(13,12,16,.6));backdrop-filter:blur(2px);
+  transform:translate(-50%,-50%) rotateX(52deg) rotateZ(-38deg) translateZ(var(--z));
+  box-shadow:0 20px 40px rgba(0,0,0,.4);transition:transform .6s var(--ease)}
+.feature:hover .layers .ly{transform:translate(-50%,-50%) rotateX(52deg) rotateZ(-38deg) translateZ(calc(var(--z) * 1.5))}
+.layers .ly1{--z:-46px;border-color:rgba(201,185,138,.25)}
+.layers .ly2{--z:0px}
+.layers .ly3{--z:46px;background:linear-gradient(135deg,rgba(201,185,138,.22),rgba(13,12,16,.5))}
+.layers .tag{position:absolute;right:-8px;top:-10px;font-size:10px;letter-spacing:.2em;color:var(--gold-2);
+  background:var(--ink);padding:3px 8px;border:1px solid var(--line);border-radius:6px;transform:rotateZ(0)}
+/* 存进图层：XMP 徽记 */
+.chip-xmp{display:inline-flex;align-items:center;gap:10px;margin-top:22px;font-size:12.5px;color:var(--gold-2);
+  border:1px dashed var(--line);border-radius:999px;padding:8px 16px;letter-spacing:.06em}
+
+/* ===================== 本机 / 付费 ===================== */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media(max-width:820px){.split{grid-template-columns:1fr}}
+.panel{border:1px solid var(--line);border-radius:18px;padding:40px 34px;background:linear-gradient(180deg,rgba(255,255,255,.015),transparent)}
+.panel .top{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.panel .dot{width:9px;height:9px;border-radius:50%}
+.panel.local .dot{background:#6fd79a;box-shadow:0 0 14px #6fd79a}
+.panel.cloud .dot{background:var(--gold-1);box-shadow:0 0 14px var(--gold-1)}
+.panel h4{font-size:19px;font-weight:600;margin:0;letter-spacing:.04em}
+.panel .k{font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--mute)}
+.panel p{color:var(--mute);font-size:14.5px;margin:18px 0 0}
+.panel ul{list-style:none;padding:0;margin:18px 0 0}
+.panel li{padding:9px 0;border-top:1px solid var(--line);font-size:14.5px;display:flex;gap:12px;align-items:flex-start}
+.panel li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;margin-top:9px;background:var(--gold-3)}
+.panel.local li::before{background:#6fd79a}
+.note-privacy{margin-top:22px;color:var(--faint);font-size:13px}
+
+/* ===================== 安装三步 ===================== */
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+@media(max-width:820px){.steps{grid-template-columns:1fr}}
+.step{position:relative;border:1px solid var(--line);border-radius:18px;padding:40px 30px 34px;overflow:hidden}
+.step::before{counter-increment:s;content:"0" counter(s);position:absolute;top:18px;right:26px;
+  font-size:52px;font-weight:200;color:rgba(201,185,138,.12)}
+.step h4{font-size:18px;font-weight:600;margin:10px 0 0;letter-spacing:.04em}
+.step p{color:var(--mute);font-size:14px;margin:12px 0 0}
+.step .ic{width:40px;height:40px;color:var(--gold-1)}
+.upgrade-note{margin-top:28px;padding:18px 22px;border-left:2px solid var(--gold-3);background:rgba(201,185,138,.05);
+  color:var(--mute);font-size:14px;border-radius:0 12px 12px 0}
+.upgrade-note b{color:var(--paper);font-weight:500}
+
+/* ===================== 需求 / FAQ ===================== */
+.req{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-bottom:70px}
+@media(max-width:820px){.req{grid-template-columns:repeat(2,1fr)}}
+.req .r{border:1px solid var(--line);border-radius:14px;padding:26px 22px}
+.req .r .k{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-2)}
+.req .r .v{font-size:16px;margin-top:10px;font-weight:500}
+.req .r small{color:var(--faint);font-size:12.5px}
+.faq-item{border-top:1px solid var(--line)}
+.faq-item:last-child{border-bottom:1px solid var(--line)}
+.faq-q{width:100%;text-align:left;background:none;border:0;color:var(--paper);font-family:inherit;
+  font-size:16.5px;padding:24px 40px 24px 0;cursor:pointer;position:relative;letter-spacing:.02em}
+.faq-q::after{content:"+";position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--gold-2);
+  font-size:22px;font-weight:200;transition:transform .4s}
+.faq-item.open .faq-q::after{transform:translateY(-50%) rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .5s var(--ease)}
+.faq-a p{color:var(--mute);margin:0 0 24px;font-size:15px;max-width:720px}
+
+/* ===================== 结尾 CTA ===================== */
+.final{text-align:center;padding:140px 0 120px}
+.final .word{display:inline-block}
+.final h2{font-size:clamp(30px,5vw,58px);font-weight:200;letter-spacing:.03em;margin:0 0 10px}
+.final h2 b{font-weight:600;background:linear-gradient(120deg,var(--gold-1),var(--gold-3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.final p{color:var(--mute);margin:0 auto 38px;max-width:460px}
+.final .cta{justify-content:center}
+
+/* ===================== 页脚 ===================== */
+footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;font-size:13px}
+.foot .brand small{color:var(--faint)}
+.foot a:hover{color:var(--gold-2)}
+.foot .legal{color:var(--faint)}
+.foot .legal a{color:var(--mute)}
+</style>
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+<div class="bg"><div class="glow"></div><div class="grain"></div></div>
+<div class="cursor-ghost" id="cghost"></div>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eadcb0"/><stop offset="1" stop-color="#a8966a"/></linearGradient>
+</defs></svg>
+
+<!-- ============ 导航 ============ -->
+<header id="header"><div class="wrap nav">
+  <a class="brand" href="#top" aria-label="After Vision">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M11.5 4.5h16v16" fill="none" stroke="#c9b98a" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M4.5 11.5l7-7M20.5 11.5l7-7M20.5 27.5l7-7" stroke="#c9b98a" stroke-opacity=".5" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="4.5" y="11.5" width="16" height="16" rx="1" fill="url(#g)"/>
+    </svg>
+    <div><b>AFTER VISION</b> <small>视界之后</small></div>
+  </a>
+  <nav class="nav-links">
+    <a href="#concept">理念</a>
+    <a href="#forms">四种形态</a>
+    <a href="#how">本机与云端</a>
+    <a href="#install">安装</a>
+    <a href="#faq">常见问题</a>
+    <a class="nav-dl" href="#download">下载</a>
+  </nav>
+</div></header>
+
+<main id="top">
+<!-- ============ Hero ============ -->
+<section class="hero"><div class="wrap">
+  <span class="eyebrow">后像 · 残像 · 视觉之后</span>
+  <h1 class="word" id="hword">
+    <span class="layer">
+      <span class="g cyan" aria-hidden="true">AFTER</span>
+      <span class="g mag" aria-hidden="true">AFTER</span>
+      <span class="base">AFTER</span>
+    </span>
+    <span class="layer">
+      <span class="g cyan" aria-hidden="true">VISION</span>
+      <span class="g mag" aria-hidden="true">VISION</span>
+      <span class="base">VISION</span>
+    </span>
+  </h1>
+  <p class="sub-cn">视 界 之 后</p>
+  <p class="lead">一个 Photoshop 插件。它把一个平面图层，变成<b>可以转动的光</b>——自动抠去背景、读出深度，生成能 360° 旋转、还能重新打光的立体图层，结果直接写回<b>这个图层</b>。</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="#download">下载 After Vision <small>· Windows</small></a>
+    <a class="btn btn-ghost" href="#concept">看看它怎么想</a>
+  </div>
+  <p class="os-note">Windows 10 / 11 · Photoshop 2023 (24.4) 及以上 · 需支持 DirectX 12 的显卡</p>
+</div>
+<div class="scroll-cue">SCROLL<i></i></div>
+</section>
+
+<!-- ============ 凝视 · 残像实验 ============ -->
+<section class="stare"><div class="wrap stare-grid">
+  <div class="stage reveal" id="stage">
+    <div class="grey"></div>
+    <svg class="inverted" viewBox="0 0 32 32" aria-hidden="true">
+      <!-- 金的补色（冷青）版本：盯久后在灰底上浮现的残像是金色 -->
+      <path d="M11.5 4.5h16v16" fill="none" stroke="#3a6f72" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M4.5 11.5l7-7M20.5 11.5l7-7M20.5 27.5l7-7" stroke="#3a6f72" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="4.5" y="11.5" width="16" height="16" rx="1" fill="#1a95a0"/>
+    </svg>
+    <div class="fix"></div>
+    <div class="ring"><svg width="46" height="46"><circle class="bg2" cx="23" cy="23" r="20"/><circle class="fg" id="ringfg" cx="23" cy="23" r="20" stroke-dasharray="126" stroke-dashoffset="0"/></svg></div>
+    <div class="cap" id="stagecap">看见那个金色方块了吗？它不在屏幕上——它在你的视网膜上。这，就是「后像」。</div>
+  </div>
+  <div class="reveal">
+    <span class="sec-tag">一个小实验</span>
+    <h3>凝视，然后<b>看见本不存在的光</b></h3>
+    <p>盯住中心的十字 8 秒。当冷色的影像消失，灰底上会浮起一枚金色的方块——那是你的眼睛留下的<b style="color:var(--paper);font-weight:500">残像</b>。</p>
+    <p class="mini">After Vision 做的是同一件事的反面：让图像在离开平面之后，仍以立体的方式「留」在画面里。</p>
+    <button class="stare-btn" id="stareBtn">开始凝视（8 秒）</button>
+  </div>
+</div></section>
+
+<div class="hr"></div>
+
+<!-- ============ 三重含义 ============ -->
+<section class="pad" id="concept"><div class="wrap">
+  <div class="sec-head reveal">
+    <span class="sec-tag">Concept · 名字的三重含义</span>
+    <h2 class="sec-title">视界之后，<b>是另一种观看</b></h2>
+    <p class="sec-desc">After Vision 这个名字，指向视觉被延长、被改写的那一刻。插件的每一项能力，都是这句话的注脚。</p>
+  </div>
+  <div class="meanings reveal">
+    <div class="meaning">
+      <div class="idx">01</div><h4>后像</h4><div class="en">Afterimage</div>
+      <p>光消失后，仍停留在视网膜上的影像。平面图层被抠出、立起，即使转到侧面，它依然「在那里」。</p>
+    </div>
+    <div class="meaning">
+      <div class="idx">02</div><h4>视界之后</h4><div class="en">After the Vision</div>
+      <p>当一幅画面完成之后，你还想多走一步——换一个角度、换一束光。立体图层让「之后」成为可能。</p>
+    </div>
+    <div class="meaning">
+      <div class="idx">03</div><h4>残像 · 超感</h4><div class="en">Ghost · Hyper-vision</div>
+      <p>动画与游戏里，极速与超感会留下残影。这里，残影是你能亲手转动、重新照亮的那一层。</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ 四种形态 ============ -->
+<section class="pad" id="forms"><div class="wrap">
+  <div class="sec-head reveal">
+    <span class="sec-tag">The Forms · 立体的四种形态</span>
+    <h2 class="sec-title">一个图层，<b>四种立起来的方式</b></h2>
+    <p class="sec-desc">从最轻的深度位移，到完全封闭、可以绕到背面的实体。按画面需要，随时切换。</p>
+  </div>
+  <div class="forms">
+    <div class="form-card flat reveal">
+      <span class="form-num">01</span>
+      <div class="form-stage"><div class="cube"><i class="f1"></i><i class="f2"></i></div></div>
+      <h4>深度平面</h4><div class="en">Depth Plane</div>
+      <p>按估计出的深度，让像素在平面上前后位移。最轻盈，适合轻微的视差与呼吸感。</p>
+    </div>
+    <div class="form-card reveal">
+      <span class="form-num">02</span>
+      <div class="form-stage"><div class="cube" style="animation-duration:7s"><i class="f1"></i><i class="f2"></i><i class="f3"></i><i class="f4"></i><i class="f5"></i><i class="f6"></i></div></div>
+      <h4>抠图浮雕</h4><div class="en">Relief</div>
+      <p>沿抠出的主体做浮雕式起伏，背景干净剥离。像一块被光雕刻过的薄浮雕。</p>
+    </div>
+    <div class="form-card reveal">
+      <span class="form-num">03</span>
+      <div class="form-stage"><div class="cube"><i class="f1"></i><i class="f2"></i><i class="f3"></i><i class="f4"></i><i class="f5"></i><i class="f6"></i></div></div>
+      <h4>实体</h4><div class="en">Solid</div>
+      <p>生成带侧壁的封闭网格，可以 360° 旋转、绕到侧面，轮廓严丝合缝、没有接缝。</p>
+    </div>
+    <div class="form-card reveal">
+      <span class="form-num">04</span>
+      <div class="form-stage"><div class="cube" style="animation-duration:4.5s"><i class="f1"></i><i class="f2"></i><i class="f3"></i><i class="f4"></i><i class="f5"></i><i class="f6"></i></div></div>
+      <h4>饱满实体</h4><div class="en">Full Body</div>
+      <p>自有算法重建的饱满体积——分块推厚、中分面插值，正背面在轮廓处自然合拢，转到背后也完整。</p>
+    </div>
+  </div>
+</div></section>
+
+<div class="hr"></div>
+
+<!-- ============ 图层特性 ============ -->
+<section class="pad"><div class="wrap">
+  <div class="feature reveal">
+    <div>
+      <span class="sec-tag">It stays a layer</span>
+      <h3>结果，直接<b>写回这个图层</b></h3>
+      <p>没有新窗口、没有导出再导入。转好的立体画面写回你选中的那个图层——层级顺序、蒙版、混合模式、不透明度，一切照旧。</p>
+      <ul>
+        <li>原地写回<span>——图层还在它原来的位置</span></li>
+        <li>蒙版与混合模式<span>——继续生效，不被打断</span></li>
+        <li>随时还原<span>——一键回到原始平面图像</span></li>
+      </ul>
+    </div>
+    <div class="layers">
+      <div class="ly ly1"></div>
+      <div class="ly ly2"></div>
+      <div class="ly ly3"><span class="tag">3D LAYER</span></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="pad" style="padding-top:0"><div class="wrap">
+  <div class="feature flip reveal">
+    <div>
+      <span class="sec-tag">It travels with your file</span>
+      <h3>立体数据，<b>存进图层本身</b></h3>
+      <p>角度、深度、光照、形态——这些立体信息被打包存进图层里，跟着 PSD 一起保存、另存、再打开。换台电脑打开同一个文件，立体依旧可编辑。</p>
+      <ul>
+        <li>跟随 PSD 保存<span>——不依赖外部工程文件</span></li>
+        <li>复制图层即复制立体<span>——拷到别处仍可独立调整</span></li>
+        <li>再次打开即可继续<span>——视角、光照原样恢复</span></li>
+      </ul>
+      <span class="chip-xmp">▣ 立体信息随图层存储，不污染你的文档结构</span>
+    </div>
+    <div class="layers">
+      <div class="ly ly1"></div>
+      <div class="ly ly2"><span class="tag">SAVED</span></div>
+      <div class="ly ly3"></div>
+    </div>
+  </div>
+</div></section>
+
+<div class="hr"></div>
+
+<!-- ============ 本机 / 付费 ============ -->
+<section class="pad" id="how"><div class="wrap">
+  <div class="sec-head reveal">
+    <span class="sec-tag">On-device & Cloud · 算力在哪里</span>
+    <h2 class="sec-title">立体，<b>全程在你的电脑上</b></h2>
+    <p class="sec-desc">抠图、深度、建模、重新打光——这些核心能力随安装包一并装好，断网也能用。只有会产生真实费用的云端增强，才需要你自己配置账户。</p>
+  </div>
+  <div class="split">
+    <div class="panel local reveal">
+      <div class="top"><span class="dot"></span><div><span class="k">On-device · 开箱即用</span><h4>立体 · 全部本机运行</h4></div></div>
+      <p>安装后立即可用，无需任何账号或联网。你的图像不会离开这台电脑。</p>
+      <ul>
+        <li>自动抠图与背景剥离</li>
+        <li>单图深度 / 几何估计</li>
+        <li>四种立体形态与 360° 旋转</li>
+        <li>重构光源：换方向、换强度、投影</li>
+      </ul>
+      <p class="note-privacy">模型与推理引擎已内置，使用显卡（DirectX 12）本地加速。</p>
+    </div>
+    <div class="panel cloud reveal">
+      <div class="top"><span class="dot"></span><div><span class="k">Cloud · 需你自行配置</span><h4>精绘 · 生图 · 可选增强</h4></div></div>
+      <p>这两项会调用第三方的付费云服务。安装包<b style="color:var(--paper)">不含</b>任何密钥或账号——你在面板里填入自己的账户信息即可启用，用多少由你掌控。</p>
+      <ul>
+        <li>精绘：把立体画面交给云端工作流平台做高清精修（填入你自己的账户密钥与工作流）</li>
+        <li>生图：通过你自己的中转站（OpenAI 兼容接口）做文 / 图生图</li>
+        <li>不配置也不影响立体功能的完整使用</li>
+      </ul>
+      <p class="note-privacy">费用与数据由你与所选服务商直接发生，软件只做本地调用与中转。</p>
+    </div>
+  </div>
+</div></section>
+
+<div class="hr"></div>
+
+<!-- ============ 安装三步 ============ -->
+<section class="pad" id="install"><div class="wrap">
+  <div class="sec-head reveal">
+    <span class="sec-tag">Install · 三步开始</span>
+    <h2 class="sec-title">三步，<b>把它请进 Photoshop</b></h2>
+  </div>
+  <div class="steps">
+    <div class="step reveal">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <h4>下载安装包</h4>
+      <p>下载 Windows 安装程序（约 260&nbsp;MB，已内置模型与引擎）。</p>
+    </div>
+    <div class="step reveal">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
+      <h4>运行并同意协议</h4>
+      <p>运行安装程序，阅读并同意《最终用户许可协议》。它会自动找到你的 Photoshop 并装好面板与引擎。</p>
+    </div>
+    <div class="step reveal">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1z"/><path d="M4 9h16M9 20V9"/></svg>
+      <h4>在 PS 中打开面板</h4>
+      <p>打开 Photoshop，在「增效工具」菜单里启动 After Vision，首次使用签署一次协议，即可开始。</p>
+    </div>
+  </div>
+  <div class="upgrade-note reveal">
+    <b>升级 Photoshop 大版本后</b>，请重新运行一次安装程序——它会把面板补装进新版本的 Photoshop。
+  </div>
+</div></section>
+
+<div class="hr"></div>
+
+<!-- ============ 需求 / FAQ ============ -->
+<section class="pad" id="faq"><div class="wrap">
+  <div class="sec-head reveal">
+    <span class="sec-tag">Requirements & FAQ</span>
+    <h2 class="sec-title">运行环境<b>与常见问题</b></h2>
+  </div>
+  <div class="req reveal">
+    <div class="r"><div class="k">系统</div><div class="v">Windows 10 / 11</div><small>64 位</small></div>
+    <div class="r"><div class="k">Photoshop</div><div class="v">2023 及以上</div><small>24.4.0+（UXP）</small></div>
+    <div class="r"><div class="k">显卡</div><div class="v">DirectX 12</div><small>用于本地加速</small></div>
+    <div class="r"><div class="k">磁盘</div><div class="v">约 700&nbsp;MB</div><small>含模型与引擎</small></div>
+  </div>
+  <div class="faq">
+    <div class="faq-item reveal"><button class="faq-q">我的图像会被上传吗？</button><div class="faq-a"><p>立体相关的全部处理——抠图、深度、建模、重新打光——都在你的电脑上完成，图像不会上传。只有当你主动使用「精绘」或「生图」这两项云端增强时，相关画面才会发往你自己配置的服务。</p></div></div>
+    <div class="faq-item reveal"><button class="faq-q">为什么「精绘 / 生图」需要我自己配置？</button><div class="faq-a"><p>这两项会调用第三方的付费云服务。为了不把任何人的账号或密钥打包进安装程序，也为了让花费完全由你掌控，这部分留给你在面板里填入自己的账户信息。不配置它们，并不影响立体功能的完整使用。</p></div></div>
+    <div class="faq-item reveal"><button class="faq-q">支持 macOS 吗？</button><div class="faq-a"><p>当前版本仅支持 Windows。本地加速依赖 Windows 的 DirectX 12，暂未提供 macOS 版本。</p></div></div>
+    <div class="faq-item reveal"><button class="faq-q">安装时提示「Windows 已保护你的电脑」怎么办？</button><div class="faq-a"><p>这是因为安装包尚未购买代码签名证书，系统对来源不熟悉的程序会先行提醒。确认来自本页面的下载后，点击「更多信息 → 仍要运行」即可。</p></div></div>
+    <div class="faq-item reveal"><button class="faq-q">立体数据会不会让 PSD 变得很大、或打不开？</button><div class="faq-a"><p>立体信息以紧凑的形式存进图层，跟随 PSD 一起保存与打开，不会改变你的文档结构。没有安装插件的电脑照常打开文件，只是看到的是写回后的平面画面。</p></div></div>
+    <div class="faq-item reveal"><button class="faq-q">下载速度慢怎么办？</button><div class="faq-a"><p>安装包托管在 GitHub Releases。若直连较慢，可借助可靠的下载工具或镜像，耐心等待其完成——文件校验完整即可正常安装。</p></div></div>
+  </div>
+</div></section>
+
+<!-- ============ 结尾 CTA ============ -->
+<section class="final" id="download"><div class="wrap">
+  <h2>把平面，<b>留在视界之后</b></h2>
+  <p>下载 After Vision，让你的下一个图层，拥有可以转动的光。</p>
+  <div class="cta">
+    <a class="btn btn-primary" id="dlBtn" href="https://github.com/rakashi409-lab/after-vision-release/releases/latest/download/AfterVision-Setup-1.0.0.exe">下载 After Vision <small>· Windows · v1.0.0</small></a>
+    <a class="btn btn-ghost" href="https://github.com/rakashi409-lab/after-vision-release/releases" target="_blank" rel="noopener">全部版本</a>
+  </div>
+  <p class="os-note" style="animation:none;opacity:1;color:var(--faint);margin-top:18px">下载即表示你同意安装时出示的《最终用户许可协议》</p>
+</div></section>
+</main>
+
+<!-- ============ 页脚 ============ -->
+<footer><div class="wrap foot">
+  <a class="brand" href="#top">
+    <svg viewBox="0 0 32 32" aria-hidden="true" style="width:22px;height:22px">
+      <path d="M11.5 4.5h16v16" fill="none" stroke="#c9b98a" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M4.5 11.5l7-7M20.5 11.5l7-7M20.5 27.5l7-7" stroke="#c9b98a" stroke-opacity=".5" stroke-width="1.5" stroke-linecap="round"/>
+      <rect x="4.5" y="11.5" width="16" height="16" rx="1" fill="url(#g)"/>
+    </svg>
+    <div><b style="letter-spacing:.14em">AFTER VISION</b> <small>· 视界之后</small></div>
+  </a>
+  <div class="legal">© 2026 After Vision · 保留一切权利 · 本软件受著作权与软件保护条例保护</div>
+</div></footer>
+
+<script>
+// 导航底色
+const header=document.getElementById('header');
+addEventListener('scroll',()=>header.classList.toggle('on',scrollY>24),{passive:true});
+
+// 标题色散残影：载入收敛 + 鼠标视差
+const hword=document.getElementById('hword');
+hword.style.setProperty('--sx','14px');hword.style.setProperty('--sy','-6px');
+requestAnimationFrame(()=>hword.classList.add('resolve'));
+addEventListener('mousemove',e=>{
+  const dx=(e.clientX/innerWidth-.5);
+  hword.style.setProperty('--mx',(dx*14).toFixed(2));
+},{passive:true});
+
+// 光标残影
+const cg=document.getElementById('cghost');let ct;
+addEventListener('mousemove',e=>{
+  cg.style.left=e.clientX+'px';cg.style.top=e.clientY+'px';cg.style.opacity='.5';
+  clearTimeout(ct);ct=setTimeout(()=>cg.style.opacity='0',120);
+},{passive:true});
+
+// 滚动揭示（不支持 IntersectionObserver 的老环境直接全部显示）
+const reveals=document.querySelectorAll('.reveal');
+if('IntersectionObserver' in window){
+  const io=new IntersectionObserver((es)=>{es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}})},{threshold:.14});
+  reveals.forEach((el,i)=>{el.style.transitionDelay=(Math.min(i%3,2)*90)+'ms';io.observe(el)});
+}else reveals.forEach(el=>el.classList.add('in'));
+
+// FAQ 手风琴
+document.querySelectorAll('.faq-q').forEach(q=>{
+  q.addEventListener('click',()=>{
+    const it=q.parentElement,a=q.nextElementSibling,open=it.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(o=>{o.classList.remove('open');o.querySelector('.faq-a').style.maxHeight=null});
+    if(!open){it.classList.add('open');a.style.maxHeight=a.scrollHeight+'px'}
+  });
+});
+
+// 凝视 · 残像实验
+const stage=document.getElementById('stage'),btn=document.getElementById('stareBtn'),ring=document.getElementById('ringfg'),cap=document.getElementById('stagecap');
+const C=2*Math.PI*20;ring.setAttribute('stroke-dasharray',C.toFixed(1));
+btn.addEventListener('click',()=>{
+  btn.disabled=true;btn.textContent='凝视中…';
+  stage.classList.remove('flash');stage.classList.add('go');
+  ring.style.transition='none';ring.style.strokeDashoffset='0';
+  requestAnimationFrame(()=>{ring.style.transition='stroke-dashoffset 8s linear';ring.style.strokeDashoffset=C.toFixed(1);});
+  setTimeout(()=>{
+    stage.classList.remove('go');stage.classList.add('flash');
+    btn.textContent='再试一次';btn.disabled=false;
+  },8000);
+});
+</script>
+</body>
+</html>
