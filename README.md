@@ -10,6 +10,8 @@
 
 前往 [**Releases**](https://github.com/rakashi409-lab/after-vision-release/releases/latest) 下载最新 Windows 安装程序，运行后按向导把面板装进你的 Photoshop。
 
+> 首次下载或安装时若出现安全提示（「不常下载」「Windows 已保护你的电脑」），这是系统对新发布程序的信誉提醒，并非检测到病毒。放行方法与 SHA-256 文件校验见[落地页常见问题](https://rakashi409-lab.github.io/after-vision-release/#safe)，校验值也写在每个发行版的说明里。
+
 ## 运行环境
 
 | | |

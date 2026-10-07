@@ -273,6 +273,16 @@ header.on{background:rgba(11,10,13,.72);backdrop-filter:blur(14px) saturate(1.2)
 .faq-item.open .faq-q::after{transform:translateY(-50%) rotate(45deg)}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .5s var(--ease)}
 .faq-a p{color:var(--mute);margin:0 0 24px;font-size:15px;max-width:720px}
+.faq-item[id]{scroll-margin-top:100px}
+.faq-a ul{color:var(--mute);font-size:15px;max-width:720px;margin:-12px 0 24px;padding-left:1.2em}
+.faq-a li{margin:7px 0}
+.faq-a b{color:var(--paper);font-weight:500}
+.faq-a code{display:block;max-width:720px;margin:-12px 0 24px;padding:11px 16px;border:1px solid var(--line);border-radius:10px;
+  background:rgba(201,185,138,.05);color:var(--gold-2);font:13px/1.6 ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+/* 安全提示的跳转链接 */
+.upgrade-note a,.final .safe a{color:var(--gold-2);border-bottom:1px dashed rgba(201,185,138,.4);white-space:nowrap}
+.upgrade-note a:hover,.final .safe a:hover{color:var(--gold-1)}
+.final .safe{margin:12px auto 0;max-width:none;color:var(--faint);font-size:13px}
 
 /* ===================== 结尾 CTA ===================== */
 .final{text-align:center;padding:140px 0 120px}
@@ -536,6 +546,9 @@ footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
   <div class="upgrade-note reveal">
     <b>升级 Photoshop 大版本后</b>，请重新运行一次安装程序——它会把面板补装进新版本的 Photoshop。
   </div>
+  <div class="upgrade-note reveal" style="margin-top:14px">
+    <b>下载或安装时出现安全提示？</b>After Vision 刚刚发布、下载量还少，浏览器和 Windows 会对不熟悉的新程序先行提醒，这并不代表文件有问题。<a href="#safe">放行方法与文件校验 →</a>
+  </div>
 </div></section>
 
 <div class="hr"></div>
@@ -556,7 +569,23 @@ footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
     <div class="faq-item reveal"><button class="faq-q">我的图像会被上传吗？</button><div class="faq-a"><p>立体相关的全部处理——抠图、深度、建模、重新打光——都在你的电脑上完成，图像不会上传。只有当你主动使用「精绘」或「生图」这两项云端增强时，相关画面才会发往你自己配置的服务。</p></div></div>
     <div class="faq-item reveal"><button class="faq-q">为什么「精绘 / 生图」需要我自己配置？</button><div class="faq-a"><p>这两项会调用第三方的付费云服务。为了不把任何人的账号或密钥打包进安装程序，也为了让花费完全由你掌控，这部分留给你在面板里填入自己的账户信息。不配置它们，并不影响立体功能的完整使用。</p></div></div>
     <div class="faq-item reveal"><button class="faq-q">支持 macOS 吗？</button><div class="faq-a"><p>当前版本仅支持 Windows。本地加速依赖 Windows 的 DirectX 12，暂未提供 macOS 版本。</p></div></div>
-    <div class="faq-item reveal"><button class="faq-q">安装时提示「Windows 已保护你的电脑」怎么办？</button><div class="faq-a"><p>这是因为安装包尚未购买代码签名证书，系统对来源不熟悉的程序会先行提醒。确认来自本页面的下载后，点击「更多信息 → 仍要运行」即可。</p></div></div>
+    <div class="faq-item reveal" id="safe"><button class="faq-q">下载时提示「不常下载」，或下载后文件被自动删除？</button><div class="faq-a">
+      <p>After Vision 刚刚发布，安装包暂未进行代码签名，下载量也还少。浏览器和杀毒软件会对这类「不熟悉」的新程序先行拦截，有时还会误报——这并不代表文件真的含有病毒。确认是从本页面或官方 Releases 下载后，可以这样放行：</p>
+      <ul>
+        <li><b>Edge</b>：在下载列表里点该文件右侧的「…」→「保留」→「显示详细信息」→「仍然保留」。</li>
+        <li><b>Chrome</b>：在下载提示里选择「保留」。</li>
+        <li><b>被 Windows 安全中心删除</b>：打开「Windows 安全中心 → 病毒和威胁防护 → 保护历史记录」，找到这条记录，在「操作」里选择「还原」。</li>
+        <li><b>被 360、火绒、腾讯电脑管家等拦截</b>：在它的隔离区（恢复区）中恢复文件，并加入信任。</li>
+      </ul>
+      <p>放行前，建议先按下面「如何确认安装包完整、未被篡改」核对一次文件校验值。</p>
+    </div></div>
+    <div class="faq-item reveal"><button class="faq-q">安装时提示「Windows 已保护你的电脑」怎么办？</button><div class="faq-a"><p>这是 Windows 的 SmartScreen 信誉提醒：程序刚发布、还没有积累足够的下载信誉时就会出现，并不是查出了病毒。确认来自本页面的下载后，点击「更多信息」→「仍要运行」即可。</p></div></div>
+    <div class="faq-item reveal"><button class="faq-q">如何确认安装包完整、未被篡改？</button><div class="faq-a">
+      <p>在安装包所在文件夹的空白处右键 →「在终端中打开」（Windows 10 可按住 Shift 再右键，选「在此处打开 PowerShell 窗口」），输入：</p>
+      <code>Get-FileHash .\AfterVision-Setup-1.0.0.exe</code>
+      <p>显示的 Hash 与下面的 SHA-256 完全一致，就说明文件与官方发布的完全相同、未被篡改：</p>
+      <code data-sha>350A3891A65679165673F9C353E98F15E39043154CF7AB06E4F7F5BF80E84AAD</code>
+    </div></div>
     <div class="faq-item reveal"><button class="faq-q">立体数据会不会让 PSD 变得很大、或打不开？</button><div class="faq-a"><p>立体信息以紧凑的形式存进图层，跟随 PSD 一起保存与打开，不会改变你的文档结构。没有安装插件的电脑照常打开文件，只是看到的是写回后的平面画面。</p></div></div>
     <div class="faq-item reveal"><button class="faq-q">下载速度慢怎么办？</button><div class="faq-a"><p>安装包托管在 GitHub Releases。若直连较慢，可借助可靠的下载工具或镜像，耐心等待其完成——文件校验完整即可正常安装。</p></div></div>
   </div>
@@ -570,7 +599,8 @@ footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
     <a class="btn btn-primary" id="dlBtn" href="https://github.com/rakashi409-lab/after-vision-release/releases/latest/download/AfterVision-Setup-1.0.0.exe">下载 After Vision <small>· Windows · v1.0.0</small></a>
     <a class="btn btn-ghost" href="https://github.com/rakashi409-lab/after-vision-release/releases" target="_blank" rel="noopener">全部版本</a>
   </div>
-  <p class="os-note" style="animation:none;opacity:1;color:var(--faint);margin-top:18px">下载即表示你同意安装时出示的《最终用户许可协议》</p>
+  <p class="os-note" style="animation:none;opacity:1;color:var(--faint);margin-top:18px;margin-bottom:0">下载即表示你同意安装时出示的《最终用户许可协议》</p>
+  <p class="safe">首次下载若被浏览器或杀毒软件拦截，并不代表文件有问题 · <a href="#safe">放行方法与 SHA-256 校验</a></p>
 </div></section>
 </main>
 
@@ -623,6 +653,11 @@ document.querySelectorAll('.faq-q').forEach(q=>{
     if(!open){it.classList.add('open');a.style.maxHeight=a.scrollHeight+'px'}
   });
 });
+// 「放行方法」链接：跳到对应问答并展开
+document.querySelectorAll('a[href="#safe"]').forEach(l=>l.addEventListener('click',()=>{
+  const it=document.getElementById('safe');
+  if(it&&!it.classList.contains('open'))it.querySelector('.faq-q').click();
+}));
 
 // 凝视 · 残像实验
 const stage=document.getElementById('stage'),btn=document.getElementById('stareBtn'),ring=document.getElementById('ringfg'),cap=document.getElementById('stagecap');
