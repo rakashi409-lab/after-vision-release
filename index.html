@@ -8,6 +8,9 @@
 <meta property="og:title" content="After Vision · 视界之后">
 <meta property="og:description" content="把平面图像，变成可以转动的光。一个 Photoshop 插件。">
 <meta name="theme-color" content="#0b0a0d">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 /* ===================== 设计体系 ===================== */
 :root{
@@ -72,7 +75,7 @@ header.on{background:rgba(11,10,13,.72);backdrop-filter:blur(14px) saturate(1.2)
 @media(max-width:720px){.nav-links a:not(.nav-dl){display:none}}
 
 /* ===================== Hero ===================== */
-.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:120px 0 80px}
+.hero{position:relative;min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:120px 0 140px}
 .eyebrow{display:inline-flex;align-items:center;gap:12px;color:var(--gold-2);font-size:12.5px;
   letter-spacing:.42em;text-transform:uppercase;margin-bottom:30px;opacity:0;animation:fade 1s .2s var(--ease) forwards}
 .eyebrow::before{content:"";width:34px;height:1px;background:linear-gradient(90deg,transparent,var(--gold-2))}
@@ -102,14 +105,18 @@ header.on{background:rgba(11,10,13,.72);backdrop-filter:blur(14px) saturate(1.2)
 .btn-ghost{color:var(--paper);border:1px solid var(--line)}
 .btn-ghost:hover{border-color:var(--gold-2);transform:translateY(-3px)}
 .btn small{font-weight:400;opacity:.7}
-.os-note{margin-top:16px;color:var(--faint);font-size:12.5px;letter-spacing:.04em;
-  opacity:0;animation:fade 1s 2s var(--ease) forwards}
+.os-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:26px 0 0;padding:0;list-style:none;
+  color:var(--mute);font-size:12.5px;letter-spacing:.06em;opacity:0;animation:fade 1s 2s var(--ease) forwards}
+.os-note li{display:flex;align-items:center;gap:18px}
+.os-note li+li::before{content:"";width:1px;height:11px;background:var(--line)}
+@media(max-width:560px){.os-note{flex-direction:column;align-items:flex-start;gap:6px}.os-note li+li::before{display:none}}
 
 /* 滚动提示 */
-.scroll-cue{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);color:var(--faint);
+.scroll-cue{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);color:var(--faint);
   font-size:11px;letter-spacing:.3em;display:flex;flex-direction:column;align-items:center;gap:10px;
   opacity:0;animation:fade 1s 2.3s var(--ease) forwards}
 .scroll-cue i{width:1px;height:46px;background:linear-gradient(var(--gold-2),transparent);animation:cue 2s var(--ease) infinite}
+@media(max-height:720px){.scroll-cue{display:none}}
 @keyframes cue{0%,100%{transform:scaleY(.4);opacity:.4;transform-origin:top}50%{transform:scaleY(1);opacity:1}}
 
 @keyframes fade{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -352,7 +359,7 @@ footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
     <a class="btn btn-primary" href="#download">下载 After Vision <small>· Windows</small></a>
     <a class="btn btn-ghost" href="#concept">看看它怎么想</a>
   </div>
-  <p class="os-note">Windows 10 / 11 · Photoshop 2023 (24.4) 及以上 · 需支持 DirectX 12 的显卡</p>
+  <ul class="os-note"><li>Windows 10 / 11</li><li>Photoshop 2023（24.4）及以上</li><li>支持 DirectX 12 的显卡</li></ul>
 </div>
 <div class="scroll-cue">SCROLL<i></i></div>
 </section>
@@ -582,9 +589,9 @@ footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
     <div class="faq-item reveal"><button class="faq-q">安装时提示「Windows 已保护你的电脑」怎么办？</button><div class="faq-a"><p>这是 Windows 的 SmartScreen 信誉提醒：程序刚发布、还没有积累足够的下载信誉时就会出现，并不是查出了病毒。确认来自本页面的下载后，点击「更多信息」→「仍要运行」即可。</p></div></div>
     <div class="faq-item reveal"><button class="faq-q">如何确认安装包完整、未被篡改？</button><div class="faq-a">
       <p>在安装包所在文件夹的空白处右键 →「在终端中打开」（Windows 10 可按住 Shift 再右键，选「在此处打开 PowerShell 窗口」），输入：</p>
-      <code>Get-FileHash .\AfterVision-Setup-1.0.0.exe</code>
+      <code>Get-FileHash .\AfterVision-Setup-1.0.5.exe</code>
       <p>显示的 Hash 与下面的 SHA-256 完全一致，就说明文件与官方发布的完全相同、未被篡改：</p>
-      <code data-sha>047E642138D48B649511D2C8D3A6DE12D0C3356C1B5E3A90A88EA97B1B6F6664</code>
+      <code data-sha>33AA802100653C740B109164F9E66C0DA95FA6698A56B06934D4817A612896CB</code>
     </div></div>
     <div class="faq-item reveal"><button class="faq-q">立体数据会不会让 PSD 变得很大、或打不开？</button><div class="faq-a"><p>立体信息以紧凑的形式存进图层，跟随 PSD 一起保存与打开，不会改变你的文档结构。没有安装插件的电脑照常打开文件，只是看到的是写回后的平面画面。</p></div></div>
     <div class="faq-item reveal"><button class="faq-q">下载速度慢怎么办？</button><div class="faq-a"><p>安装包托管在 GitHub Releases。若直连较慢，可借助可靠的下载工具或镜像，耐心等待其完成——文件校验完整即可正常安装。</p></div></div>
@@ -596,7 +603,7 @@ footer{border-top:1px solid var(--line);padding:50px 0 60px;color:var(--faint)}
   <h2>把平面，<b>留在视界之后</b></h2>
   <p>下载 After Vision，让你的下一个图层，拥有可以转动的光。</p>
   <div class="cta">
-    <a class="btn btn-primary" id="dlBtn" href="https://github.com/rakashi409-lab/after-vision-release/releases/latest/download/AfterVision-Setup-1.0.0.exe">下载 After Vision <small>· Windows · v1.0.0</small></a>
+    <a class="btn btn-primary" id="dlBtn" href="https://github.com/rakashi409-lab/after-vision-release/releases/latest/download/AfterVision-Setup-1.0.5.exe">下载 After Vision <small>· Windows · v1.0.5</small></a>
     <a class="btn btn-ghost" href="https://github.com/rakashi409-lab/after-vision-release/releases" target="_blank" rel="noopener">全部版本</a>
   </div>
   <p class="os-note" style="animation:none;opacity:1;color:var(--faint);margin-top:18px;margin-bottom:0">下载即表示你同意安装时出示的《最终用户许可协议》</p>
